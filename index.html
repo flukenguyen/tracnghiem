@@ -714,37 +714,18 @@
                             <!-- Main OMR Canvas (1000x1452 High-Res A4 Ratio) -->
                             <canvas id="omrScannerCanvas" width="1000" height="1452" class="w-full max-h-[78vh] md:max-h-[720px] object-contain bg-white"></canvas>
 
-                            <!-- Khung camera đúng tỉ lệ phiếu 1000:1452 (cùng hệ tọa độ với phiếu). Ảnh chụp = đúng vùng trong khung này -->
-                            <div id="cameraStage" class="hidden relative bg-black" style="aspect-ratio:1000/1452;width:min(100%,calc(78vh*1000/1452));">
+                            <!-- Khung camera: dùng TOÀN BỘ khung hình camera (không cắt), máy tự tìm 4 ô vuông đen ở bất kỳ vị trí nào -->
+                            <div id="cameraStage" class="hidden relative bg-black" style="aspect-ratio:3/4;width:min(100%,calc(78vh*0.75));">
                                 <video id="cameraVideo" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
+                                <canvas id="camDebug" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
                                 <div id="cameraViewfinderOverlay" class="absolute inset-0 pointer-events-none">
                                     <div class="scanner-laser"></div>
-                                    <!-- Viền phiếu: nối tâm 4 ô vuông góc -->
-                                    <div class="absolute border border-dashed border-emerald-400/70" style="left:3.29%;top:2.73%;width:93.12%;height:94.79%"></div>
-                                    <div id="camCornerTL" class="absolute border-[3px] border-emerald-400 rounded-sm bg-emerald-400/15" style="left:3.290%;top:2.734%;width:6.2%;aspect-ratio:1;transform:translate(-50%,-50%)">
-                                        <div class="absolute inset-[34%] bg-emerald-400"></div>
-                                    </div>
-                                    <div id="camCornerTR" class="absolute border-[3px] border-emerald-400 rounded-sm bg-emerald-400/15" style="left:96.410%;top:2.734%;width:6.2%;aspect-ratio:1;transform:translate(-50%,-50%)">
-                                        <div class="absolute inset-[34%] bg-emerald-400"></div>
-                                    </div>
-                                    <div id="camCornerBL" class="absolute border-[3px] border-emerald-400 rounded-sm bg-emerald-400/15" style="left:3.290%;top:97.521%;width:6.2%;aspect-ratio:1;transform:translate(-50%,-50%)">
-                                        <div class="absolute inset-[34%] bg-emerald-400"></div>
-                                    </div>
-                                    <div id="camCornerBR" class="absolute border-[3px] border-emerald-400 rounded-sm bg-emerald-400/15" style="left:96.410%;top:97.521%;width:6.2%;aspect-ratio:1;transform:translate(-50%,-50%)">
-                                        <div class="absolute inset-[34%] bg-emerald-400"></div>
-                                    </div>
-<div class="absolute border-2 border-emerald-300/70 rounded-sm" style="left:3.290%;top:30.813%;width:2.710%;aspect-ratio:1;transform:translate(-50%,-50%)"></div>
-<div class="absolute border-2 border-emerald-300/70 rounded-sm" style="left:65.870%;top:30.813%;width:2.710%;aspect-ratio:1;transform:translate(-50%,-50%)"></div>
-<div class="absolute border-2 border-emerald-300/70 rounded-sm" style="left:96.410%;top:30.813%;width:2.710%;aspect-ratio:1;transform:translate(-50%,-50%)"></div>
-<div class="absolute border-2 border-emerald-300/70 rounded-sm" style="left:66.300%;top:2.734%;width:2.710%;aspect-ratio:1;transform:translate(-50%,-50%)"></div>
-                                    <!-- Vạch ngăn các phần (theo phiếu thật) -->
-                                    <div class="absolute inset-x-[3.3%] border-t border-dashed border-emerald-400/50" style="top:30.8%"></div>
-                                    <div class="absolute inset-x-[3.3%] border-t border-dashed border-emerald-400/50" style="top:53.4%"></div>
-                                    <div class="absolute inset-x-[3.3%] border-t border-dashed border-emerald-400/50" style="top:66.5%"></div>
+                                    <button id="camSwitchBtn" onclick="switchCamera()" class="hidden pointer-events-auto absolute top-2 right-2 px-2.5 py-1.5 rounded-lg bg-black/60 border border-white/30 text-white text-[11px] font-bold" aria-label="Đổi camera">&#x21BB; Đổi camera</button>
+                                    <input id="camZoom" type="range" class="hidden pointer-events-auto absolute bottom-[8%] right-3 w-28 accent-emerald-400" aria-label="Zoom">
                                     <button onclick="captureFromCameraAndGrade()" class="pointer-events-auto absolute bottom-[6%] left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-white/90 border-4 border-emerald-400 shadow-xl active:scale-95 transition" aria-label="Chụp và chấm"><i class="fa-solid fa-camera text-xl text-slate-900"></i></button>
                                     <div class="absolute bottom-[1.2%] inset-x-0 text-center px-2">
                                         <span id="camAutoStatus" class="inline-block px-2.5 py-0.5 rounded-full bg-black/70 text-emerald-300 text-[10px] font-medium border border-emerald-500/40">
-                                            Đưa phiếu vào khung, máy tự chụp khi thấy đủ 4 ô vuông đen
+                                            Hướng camera vào phiếu, máy tự chụp khi thấy đủ 4 ô vuông đen
                                         </span>
                                     </div>
                                 </div>
@@ -2197,7 +2178,11 @@
         }
 
         function autoDetectFourCornersAndWarp(reRunOMR = true) {
-            photoCornerPoints = detectFiducialCornersOnOriginalPhoto();
+            let detected = null;
+            if (hasUploadedRealPhoto && photoSource) {
+                try { detected = detectCornersForCurrentPhoto(); } catch (e) { detected = null; }
+            }
+            photoCornerPoints = detected || detectFiducialCornersOnOriginalPhoto();
             warpPhotoToCanonicalBuffer();
             if (isCornerAdjustMode) {
                 drawCornerCalibrationOverlay();
@@ -2707,35 +2692,69 @@
         // =========================================================================
         // 7. CAMERA STREAMING, UPLOAD & SIMULATED SHEET SCANNING
         // =========================================================================
-        async function startLiveCamera() {
+        async function openCameraStream(deviceId) {
             const video = document.getElementById('cameraVideo');
+            if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+            const vc = deviceId
+                ? { deviceId: { exact: deviceId }, width: { ideal: 1440 }, height: { ideal: 1920 } }
+                : { facingMode: { ideal: 'environment' }, width: { ideal: 1440 }, height: { ideal: 1920 } };
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
+            video.srcObject = mediaStream;
+            video.onloadedmetadata = fitCameraStage;
+            try { await video.play(); } catch (e) {}
+            fitCameraStage();
+            // Lấy nét liên tục + góc rộng nhất (zoom nhỏ nhất) để đứng gần phiếu mà vẫn thấy đủ 4 góc
+            const zoomEl = document.getElementById('camZoom');
+            zoomEl.classList.add('hidden');
+            try {
+                const track = mediaStream.getVideoTracks()[0];
+                const caps = track.getCapabilities ? track.getCapabilities() : {};
+                if (caps.focusMode && caps.focusMode.includes('continuous')) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+                if (caps.zoom && typeof caps.zoom.min === 'number' && caps.zoom.max > caps.zoom.min) {
+                    await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+                    zoomEl.min = caps.zoom.min; zoomEl.max = caps.zoom.max; zoomEl.step = caps.zoom.step || 0.1; zoomEl.value = caps.zoom.min;
+                    zoomEl.oninput = () => { try { track.applyConstraints({ advanced: [{ zoom: parseFloat(zoomEl.value) }] }); } catch (e) {} };
+                    zoomEl.classList.remove('hidden');
+                }
+            } catch (e) {}
+        }
+
+        async function refreshCameraList() {
+            try {
+                const all = await navigator.mediaDevices.enumerateDevices();
+                camDevices = all.filter(d => d.kind === 'videoinput' && !/front|user|trước/i.test(d.label || ''));
+                const cur = mediaStream && mediaStream.getVideoTracks()[0] && mediaStream.getVideoTracks()[0].getSettings().deviceId;
+                camDeviceIdx = Math.max(0, camDevices.findIndex(d => d.deviceId === cur));
+                document.getElementById('camSwitchBtn').classList.toggle('hidden', camDevices.length < 2);
+            } catch (e) {}
+        }
+
+        async function switchCamera() {
+            if (camDevices.length < 2) return;
+            camDeviceIdx = (camDeviceIdx + 1) % camDevices.length;
+            try {
+                await openCameraStream(camDevices[camDeviceIdx].deviceId);
+                startAutoScan();
+                showToast('Đã đổi camera. Camera góc rộng (0.5x) giúp đứng gần phiếu hơn.');
+            } catch (e) { showToast('Không đổi được camera này.', 'error'); }
+        }
+
+        async function startLiveCamera() {
             const canvas = document.getElementById('omrScannerCanvas');
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.isSecureContext) {
                 showToast('Camera trực tiếp chỉ chạy khi mở trang bằng HTTPS. Hãy bấm "Chụp ảnh phiếu" (dùng ứng dụng camera của máy).', 'error');
                 return;
             }
             try {
-                mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1440 }, height: { ideal: 1920 }, aspectRatio: { ideal: 3 / 4 } },
-                    audio: false
-                });
-                video.srcObject = mediaStream;
+                await openCameraStream(null);
                 document.getElementById('cameraStage').classList.remove('hidden');
                 canvas.classList.add('hidden');
-                try { await video.play(); } catch (e) {}
-                // Lấy nét liên tục nếu máy hỗ trợ
-                try {
-                    const track = mediaStream.getVideoTracks()[0];
-                    const caps = track.getCapabilities ? track.getCapabilities() : {};
-                    if (caps.focusMode && caps.focusMode.includes('continuous')) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-                    // Góc rộng nhất có thể để đứng gần phiếu mà vẫn thấy đủ 4 góc
-                    if (caps.zoom && typeof caps.zoom.min === 'number') await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
-                } catch (e) {}
-                startAutoScan();
                 document.getElementById('btnStartCam').classList.add('hidden');
                 document.getElementById('btnStopCam').classList.remove('hidden');
                 document.getElementById('btnCaptureCamera').classList.remove('hidden');
-                showToast('Đã bật Camera. Canh 4 góc phiếu vào khung xanh rồi bấm nút tròn!');
+                await refreshCameraList();
+                startAutoScan();
+                showToast('Đã bật Camera. Hướng vào phiếu, máy sẽ tự chụp khi thấy đủ 4 ô vuông đen.');
             } catch (err) {
                 showToast('Không mở được camera (chưa cấp quyền hoặc thiết bị không có camera). Hãy dùng "Chụp ảnh phiếu" hoặc "Chọn ảnh có sẵn".', 'error');
             }
@@ -2754,207 +2773,174 @@
             document.getElementById('btnCaptureCamera').classList.add('hidden');
         }
 
-        // Cắt đúng vùng đang thấy trong khung ngắm (object-cover, tỉ lệ phiếu 1000:1452)
-        function getVideoCropRect(video) {
-            const vw = video.videoWidth, vh = video.videoHeight;
-            const target = SHEET_W / SHEET_H;
-            let sw = vw, sh = vh, sx = 0, sy = 0;
-            if (vw / vh > target) { sw = vh * target; sx = (vw - sw) / 2; }
-            else { sh = vw / target; sy = (vh - sh) / 2; }
-            return { sx, sy, sw, sh };
-        }
+        // =========================================================================
+        // NHẬN DIỆN TỜ PHIẾU TỪ 4 Ô VUÔNG ĐEN (dùng chung cho camera trực tiếp và ảnh chụp/ảnh tải lên)
+        // =========================================================================
+        // - Không phụ thuộc vị trí/kích thước/hướng của phiếu trong khung hình.
+        // - Tìm các ô vuông đen đặc, đứng riêng trên nền sáng; chọn 4 ô tạo tứ giác lớn nhất cùng cỡ => 4 góc phiếu.
+        // - Tự xác định hướng (xoay 90/180 độ) nhờ hàng ô vuông giữa phiếu nằm lệch về phía trên.
+        const DETECT_W = 320;
+        const SHEET_ASPECT = (964.1 - 32.9) / (1416.0 - 39.7);   // rộng/cao giữa tâm 4 ô góc = 0.677
+        let _detCanvas = null, _detCtx = null;
 
-        function grabCroppedFrame(video) {
-            const r = getVideoCropRect(video);
-            const snap = document.createElement('canvas');
-            snap.width = Math.round(r.sw);
-            snap.height = Math.round(r.sh);
-            snap.getContext('2d').drawImage(video, r.sx, r.sy, r.sw, r.sh, 0, 0, snap.width, snap.height);
-            return snap;
+        function _quadArea(p) {                // p: 4 điểm theo thứ tự chu vi
+            let a = 0;
+            for (let i = 0; i < 4; i++) { const q = p[(i + 1) % 4]; a += p[i].x * q.y - q.x * p[i].y; }
+            return Math.abs(a) / 2;
         }
-
-        function captureFromCameraAndGrade() {
-            const video = document.getElementById('cameraVideo');
-            if (!video.videoWidth) { showToast('Camera chưa sẵn sàng, thử lại sau giây lát.', 'error'); return; }
-            loadPhotoSource(grabCroppedFrame(video));
-            stopLiveCamera();
-            showToast('Đã chụp, tự bắt 4 góc đen và chấm bài!');
-            scrollToScanResult();
+        function _orderCW(pts) {
+            const cx = pts.reduce((t, p) => t + p.x, 0) / pts.length, cy = pts.reduce((t, p) => t + p.y, 0) / pts.length;
+            return [...pts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
         }
-
-        // ====================== TỰ ĐỘNG NHẬN 4 Ô VUÔNG & TỰ CHỤP ======================
-        const AUTO_W = 240;
-        const AUTO_H = Math.round(AUTO_W * SHEET_H / SHEET_W);
-        const AUTO_STABLE_FRAMES = 5;      // ~0,8 giây giữ yên
-        let autoScanTimer = null, autoScanBusy = false, autoScanLast = null, autoScanStable = 0, autoScanStartAt = 0;
-        let autoScanCanvas = null, autoScanCtx = null;
-        const AUTO_CORNER_IDS = ['camCornerTL', 'camCornerTR', 'camCornerBL', 'camCornerBR'];
-
-        function setAutoStatus(text, ok) {
-            const el = document.getElementById('camAutoStatus');
-            if (!el) return;
-            el.textContent = text;
-            el.style.color = ok ? '#fde047' : '';
-        }
-        function setCornerBoxColors(found, stable) {
-            AUTO_CORNER_IDS.forEach((id, i) => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.style.borderColor = stable ? '#22c55e' : (found && found[i] ? '#facc15' : '');
-                el.style.backgroundColor = stable ? 'rgba(34,197,94,0.35)' : (found && found[i] ? 'rgba(250,204,21,0.25)' : '');
-            });
-        }
-
-        function startAutoScan() {
-            stopAutoScan();
-            autoScanBusy = false; autoScanLast = null; autoScanStable = 0;
-            autoScanStartAt = performance.now() + 900; // chờ camera lấy nét/lấy sáng
-            if (!autoScanCanvas) {
-                autoScanCanvas = document.createElement('canvas');
-                autoScanCanvas.width = AUTO_W; autoScanCanvas.height = AUTO_H;
-                autoScanCtx = autoScanCanvas.getContext('2d', { willReadFrequently: true });
+        function _isConvex(p) {
+            let sign = 0;
+            for (let i = 0; i < 4; i++) {
+                const a = p[i], b = p[(i + 1) % 4], c = p[(i + 2) % 4];
+                const cr = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+                if (Math.abs(cr) < 1e-6) return false;
+                const sg = cr > 0 ? 1 : -1;
+                if (sign === 0) sign = sg; else if (sg !== sign) return false;
             }
-            const wrap = document.getElementById('autoCapWrap');
-            if (wrap) { wrap.classList.remove('hidden'); wrap.style.display = 'flex'; }
-            setAutoStatus('Đưa phiếu vào khung, máy tự chụp khi thấy đủ 4 ô vuông đen', false);
-            autoScanTimer = setInterval(autoScanTick, 160);
+            return true;
         }
+        function _dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
-        function stopAutoScan() {
-            if (autoScanTimer) { clearInterval(autoScanTimer); autoScanTimer = null; }
-            const wrap = document.getElementById('autoCapWrap');
-            if (wrap) { wrap.classList.add('hidden'); wrap.style.display = 'none'; }
-            setCornerBoxColors(null, false);
-        }
-
-        // Tìm ô vuông đen đặc ở 4 vùng góc của khung hình (đã cắt theo tỉ lệ phiếu)
-        function detectSheetCornersInFrame() {
-            const video = document.getElementById('cameraVideo');
-            if (!video || !video.videoWidth) return null;
-            const r = getVideoCropRect(video);
-            autoScanCtx.drawImage(video, r.sx, r.sy, r.sw, r.sh, 0, 0, AUTO_W, AUTO_H);
-            const d = autoScanCtx.getImageData(0, 0, AUTO_W, AUTO_H).data;
-            const N = AUTO_W * AUTO_H;
+        function detectSheetSquares(src, sw, sh) {
+            const AW = DETECT_W, AH = Math.max(40, Math.round(DETECT_W * sh / sw));
+            if (!_detCanvas) _detCanvas = document.createElement('canvas');
+            if (_detCanvas.width !== AW || _detCanvas.height !== AH) {
+                _detCanvas.width = AW; _detCanvas.height = AH;
+                _detCtx = _detCanvas.getContext('2d', { willReadFrequently: true });
+            }
+            _detCtx.drawImage(src, 0, 0, sw, sh, 0, 0, AW, AH);
+            const d = _detCtx.getImageData(0, 0, AW, AH).data;
+            const N = AW * AH;
             const g = new Uint8Array(N);
-            const hist = new Uint32Array(256);
-            for (let i = 0; i < N; i++) {
-                const l = (d[i * 4] * 77 + d[i * 4 + 1] * 150 + d[i * 4 + 2] * 29) >> 8;
-                g[i] = l; hist[l]++;
-            }
-            // Otsu
-            let sumAll = 0; for (let i = 0; i < 256; i++) sumAll += i * hist[i];
-            let wB = 0, sumB = 0, best = 0, otsu = 100;
-            for (let t = 0; t < 256; t++) {
-                wB += hist[t]; if (!wB) continue;
-                const wF = N - wB; if (!wF) break;
-                sumB += t * hist[t];
-                const mB = sumB / wB, mF = (sumAll - sumB) / wF;
-                const v = wB * wF * (mB - mF) * (mB - mF);
-                if (v > best) { best = v; otsu = t; }
-            }
-            const thr = Math.max(35, Math.min(otsu * 0.75, 110));
+            for (let i = 0; i < N; i++) g[i] = (d[i * 4] * 77 + d[i * 4 + 1] * 150 + d[i * 4 + 2] * 29) >> 8;
 
-            const rw = Math.round(AUTO_W * 0.30), rh = Math.round(AUTO_H * 0.18);
-            const regions = [
-                { x0: 0, y0: 0, x1: rw, y1: rh },                                   // TL
-                { x0: AUTO_W - rw, y0: 0, x1: AUTO_W, y1: rh },                      // TR
-                { x0: 0, y0: AUTO_H - rh, x1: rw, y1: AUTO_H },                      // BL
-                { x0: AUTO_W - rw, y0: AUTO_H - rh, x1: AUTO_W, y1: AUTO_H }         // BR
-            ];
+            // Ảnh tích phân -> độ sáng trung bình cục bộ, "đen" = tối hơn hẳn vùng xung quanh (chịu được bóng đổ, thiếu sáng)
+            const W1 = AW + 1;
+            const integ = new Int32Array(W1 * (AH + 1));
+            for (let y = 0; y < AH; y++) {
+                let row = 0;
+                for (let x = 0; x < AW; x++) { row += g[y * AW + x]; integ[(y + 1) * W1 + (x + 1)] = integ[y * W1 + (x + 1)] + row; }
+            }
+            const R = Math.max(6, Math.round(AW * 0.04));
+            const dark = new Uint8Array(N);
+            for (let y = 0; y < AH; y++) {
+                const y0 = Math.max(0, y - R), y1 = Math.min(AH, y + R + 1);
+                for (let x = 0; x < AW; x++) {
+                    const x0 = Math.max(0, x - R), x1 = Math.min(AW, x + R + 1);
+                    const sum = integ[y1 * W1 + x1] - integ[y0 * W1 + x1] - integ[y1 * W1 + x0] + integ[y0 * W1 + x0];
+                    const lm = sum / ((x1 - x0) * (y1 - y0));
+                    const v = g[y * AW + x];
+                    if (lm > 45 && v < lm * 0.6 && v < 150) dark[y * AW + x] = 1;
+                }
+            }
+
             const visited = new Uint8Array(N);
             const stack = new Int32Array(N);
-            const found = [false, false, false, false];
-            const corners = [null, null, null, null];
-
-            regions.forEach((reg, ri) => {
-                let bestCand = null;
-                for (let y = reg.y0; y < reg.y1; y++) {
-                    for (let x = reg.x0; x < reg.x1; x++) {
-                        const p = y * AUTO_W + x;
-                        if (visited[p] || g[p] >= thr) continue;
-                        let sp = 0, area = 0, sx = 0, sy = 0, minX = x, maxX = x, minY = y, maxY = y;
-                        stack[sp++] = p; visited[p] = 1;
-                        while (sp) {
-                            const q = stack[--sp];
-                            const qx = q % AUTO_W, qy = (q / AUTO_W) | 0;
-                            area++; sx += qx; sy += qy;
-                            if (qx < minX) minX = qx; if (qx > maxX) maxX = qx;
-                            if (qy < minY) minY = qy; if (qy > maxY) maxY = qy;
-                            const nb = [qx > reg.x0 ? q - 1 : -1, qx < reg.x1 - 1 ? q + 1 : -1, qy > reg.y0 ? q - AUTO_W : -1, qy < reg.y1 - 1 ? q + AUTO_W : -1];
-                            for (let k = 0; k < 4; k++) {
-                                const n = nb[k];
-                                if (n >= 0 && !visited[n] && g[n] < thr) { visited[n] = 1; stack[sp++] = n; }
-                            }
-                        }
-                        const bw = maxX - minX + 1, bh = maxY - minY + 1;
-                        if (bw < 3 || bh < 3 || bw > 26 || bh > 26) continue;
-                        const ratio = bw / bh;
-                        if (ratio < 0.7 || ratio > 1.43) continue;
-                        if (area / (bw * bh) < 0.8) continue;
-                        // không dính mép vùng/mép ảnh (tránh khối bị cắt)
-                        if (minX <= reg.x0 || minY <= reg.y0 || maxX >= reg.x1 - 1 || maxY >= reg.y1 - 1) continue;
-                        if (minX < 1 || minY < 1 || maxX > AUTO_W - 2 || maxY > AUTO_H - 2) continue;
-                        // viền quanh phải là nền sáng (ô vuông đứng riêng, không phải mảng tối/bóng)
-                        let ringN = 0, ringLight = 0;
-                        for (let yy = minY - 2; yy <= maxY + 2; yy++) {
-                            for (let xx = minX - 2; xx <= maxX + 2; xx++) {
-                                if (xx >= minX && xx <= maxX && yy >= minY && yy <= maxY) continue;
-                                if (xx < 0 || yy < 0 || xx >= AUTO_W || yy >= AUTO_H) continue;
-                                ringN++; if (g[yy * AUTO_W + xx] >= thr) ringLight++;
-                            }
-                        }
-                        if (ringN === 0 || ringLight / ringN < 0.85) continue;
-                        if (!bestCand || area > bestCand.area) {
-                            bestCand = { x: sx / area + 0.5, y: sy / area + 0.5, w: bw, h: bh, area };
+            const cands = [];
+            const maxS = AW * 0.14;
+            for (let y = 1; y < AH - 1; y++) {
+                for (let x = 1; x < AW - 1; x++) {
+                    const p = y * AW + x;
+                    if (!dark[p] || visited[p]) continue;
+                    let sp = 0, area = 0, sx = 0, sy = 0, minX = x, maxX = x, minY = y, maxY = y;
+                    stack[sp++] = p; visited[p] = 1;
+                    while (sp) {
+                        const q = stack[--sp];
+                        const qx = q % AW, qy = (q / AW) | 0;
+                        area++; sx += qx; sy += qy;
+                        if (qx < minX) minX = qx; if (qx > maxX) maxX = qx;
+                        if (qy < minY) minY = qy; if (qy > maxY) maxY = qy;
+                        if (qx > 0 && dark[q - 1] && !visited[q - 1]) { visited[q - 1] = 1; stack[sp++] = q - 1; }
+                        if (qx < AW - 1 && dark[q + 1] && !visited[q + 1]) { visited[q + 1] = 1; stack[sp++] = q + 1; }
+                        if (qy > 0 && dark[q - AW] && !visited[q - AW]) { visited[q - AW] = 1; stack[sp++] = q - AW; }
+                        if (qy < AH - 1 && dark[q + AW] && !visited[q + AW]) { visited[q + AW] = 1; stack[sp++] = q + AW; }
+                    }
+                    const bw = maxX - minX + 1, bh = maxY - minY + 1;
+                    if (bw < 3 || bh < 3 || bw > maxS || bh > maxS) continue;
+                    const ratio = bw / bh;
+                    if (ratio < 0.65 || ratio > 1.55) continue;
+                    if (area / (bw * bh) < 0.72) continue;
+                    if (minX < 1 || minY < 1 || maxX > AW - 2 || maxY > AH - 2) continue;
+                    let ringN = 0, ringLight = 0;
+                    for (let yy = minY - 2; yy <= maxY + 2; yy++) {
+                        for (let xx = minX - 2; xx <= maxX + 2; xx++) {
+                            if (xx >= minX && xx <= maxX && yy >= minY && yy <= maxY) continue;
+                            if (xx < 0 || yy < 0 || xx >= AW || yy >= AH) continue;
+                            ringN++; if (!dark[yy * AW + xx]) ringLight++;
                         }
                     }
+                    if (ringN === 0 || ringLight / ringN < 0.8) continue;
+                    cands.push({ x: sx / area + 0.5, y: sy / area + 0.5, w: bw, h: bh, s: (bw + bh) / 2, area });
                 }
-                if (bestCand) { found[ri] = true; corners[ri] = bestCand; }
-            });
-
-            const cnt = found.filter(Boolean).length;
-            if (cnt < 4) return { ok: false, found, cnt };
-
-            // Kiểm tra hình học: 4 tâm tạo thành tứ giác giống tờ phiếu, đủ lớn
-            const [tl, tr, bl, br] = corners;
-            const topW = Math.hypot(tr.x - tl.x, tr.y - tl.y), botW = Math.hypot(br.x - bl.x, br.y - bl.y);
-            const leftH = Math.hypot(bl.x - tl.x, bl.y - tl.y), rightH = Math.hypot(br.x - tr.x, br.y - tr.y);
-            const avgW = (topW + botW) / 2, avgH = (leftH + rightH) / 2;
-            const sizes = corners.map(c => Math.max(c.w, c.h));
-            const okSize = Math.max(...sizes) / Math.min(...sizes) <= 1.7;
-            const okShape = Math.abs(topW - botW) / avgW < 0.15 && Math.abs(leftH - rightH) / avgH < 0.15
-                && avgW / avgH > 0.55 && avgW / avgH < 0.82 && avgW > AUTO_W * 0.6;
-            return { ok: okSize && okShape, found, cnt, corners };
-        }
-
-        function autoScanTick() {
-            if (!mediaStream || autoScanBusy) return;
-            const toggle = document.getElementById('autoCaptureToggle');
-            if (toggle && !toggle.checked) { setAutoStatus('Chế độ thủ công: bấm nút tròn để chụp', false); setCornerBoxColors(null, false); return; }
-            if (performance.now() < autoScanStartAt) return;
-            const res = detectSheetCornersInFrame();
-            if (!res) return;
-            if (res.ok) {
-                const cur = res.corners;
-                if (autoScanLast) {
-                    const disp = Math.max(...cur.map((c, i) => Math.hypot(c.x - autoScanLast[i].x, c.y - autoScanLast[i].y)));
-                    autoScanStable = disp < 2.5 ? autoScanStable + 1 : 1;
-                } else autoScanStable = 1;
-                autoScanLast = cur;
-                setCornerBoxColors(res.found, autoScanStable >= 2);
-                setAutoStatus(`Thấy đủ 4 ô vuông, giữ yên máy… ${Math.min(autoScanStable, AUTO_STABLE_FRAMES)}/${AUTO_STABLE_FRAMES}`, true);
-                if (autoScanStable >= AUTO_STABLE_FRAMES) {
-                    autoScanBusy = true;
-                    autoCaptureNow(cur);
-                }
-            } else {
-                autoScanLast = null; autoScanStable = 0;
-                setCornerBoxColors(res.found, false);
-                setAutoStatus(res.cnt > 0 ? `Mới thấy ${res.cnt}/4 ô vuông, đưa đủ 4 góc phiếu vào khung` : 'Đang tìm 4 ô vuông đen ở góc phiếu…', false);
             }
+            cands.sort((a, b) => b.s - a.s);
+            const out = { ok: false, AW, AH, sw, sh, cands, quad: null, reason: cands.length >= 4 ? 'shape' : 'few' };
+
+            const tried = [];
+            for (let i = 0; i < Math.min(cands.length, 10); i++) {
+                const ref = cands[i].s;
+                if (tried.some(t => Math.abs(t - ref) / ref < 0.08)) continue;
+                tried.push(ref);
+                const grp = cands.filter(c => c.s >= ref * 0.72 && c.s <= ref * 1.4).slice(0, 14);
+                if (grp.length < 5) continue;
+
+                // 4 ô tạo tứ giác lồi có diện tích lớn nhất = 4 góc phiếu
+                let best = null, bestArea = 0;
+                for (let a = 0; a < grp.length; a++) for (let b = a + 1; b < grp.length; b++)
+                    for (let c = b + 1; c < grp.length; c++) for (let e = c + 1; e < grp.length; e++) {
+                        const q = _orderCW([grp[a], grp[b], grp[c], grp[e]]);
+                        if (!_isConvex(q)) continue;
+                        const ar = _quadArea(q);
+                        if (ar > bestArea) { bestArea = ar; best = q; }
+                    }
+                if (!best) continue;
+
+                // Gán nhãn TL, TR, BR, BL: chọn cách xoay nhãn cho tỉ lệ rộng/cao gần 0.677
+                const ratioFor = k => {
+                    const TL = best[k], TR = best[(k + 1) % 4], BR = best[(k + 2) % 4], BL = best[(k + 3) % 4];
+                    return ((_dist(TL, TR) + _dist(BL, BR)) / 2) / ((_dist(TL, BL) + _dist(TR, BR)) / 2);
+                };
+                let k0 = 0, bestDiff = Infinity;
+                for (let k = 0; k < 4; k++) { const df = Math.abs(Math.log(ratioFor(k) / SHEET_ASPECT)); if (df < bestDiff) { bestDiff = df; k0 = k; } }
+                // Phân biệt đầu/cuối phiếu: hàng ô vuông giữa phiếu nằm ở ~30% chiều cao tính từ trên
+                const lab = k => ({ tl: best[k], tr: best[(k + 1) % 4], br: best[(k + 2) % 4], bl: best[(k + 3) % 4] });
+                let L = lab(k0);
+                const axis = { x: (L.bl.x + L.br.x) / 2 - (L.tl.x + L.tr.x) / 2, y: (L.bl.y + L.br.y) / 2 - (L.tl.y + L.tr.y) / 2 };
+                const top = { x: (L.tl.x + L.tr.x) / 2, y: (L.tl.y + L.tr.y) / 2 };
+                const a2 = axis.x * axis.x + axis.y * axis.y;
+                let nTop = 0, nBot = 0;
+                grp.forEach(m => {
+                    if (best.includes(m)) return;
+                    const t = ((m.x - top.x) * axis.x + (m.y - top.y) * axis.y) / a2;
+                    if (t > 0.12 && t < 0.88) { if (t < 0.5) nTop++; else nBot++; }
+                });
+                if (nBot > nTop) L = lab((k0 + 2) % 4);
+
+                const W = (_dist(L.tl, L.tr) + _dist(L.bl, L.br)) / 2, H = (_dist(L.tl, L.bl) + _dist(L.tr, L.br)) / 2;
+                const ratio = W / H;
+                const symOK = Math.abs(_dist(L.tl, L.tr) - _dist(L.bl, L.br)) / W < 0.25 && Math.abs(_dist(L.tl, L.bl) - _dist(L.tr, L.br)) / H < 0.25;
+                const sizes = [L.tl, L.tr, L.bl, L.br].map(c => c.s);
+                const sizeOK = Math.max(...sizes) / Math.min(...sizes) <= 1.7;
+                const bigEnough = W >= 0.25 * Math.min(AW, AH);
+                if (ratio > 0.5 && ratio < 0.9 && symOK && sizeOK && bigEnough) {
+                    const k = sw / AW;
+                    const toSrc = c => ({ x: c.x * k, y: c.y * k, w: c.w * k, h: c.h * k });
+                    out.ok = true; out.reason = 'ok';
+                    out.quad = L;                                           // toạ độ trong ảnh dò (AW x AH)
+                    out.corners = { tl: toSrc(L.tl), tr: toSrc(L.tr), bl: toSrc(L.bl), br: toSrc(L.br) };   // toạ độ ảnh gốc
+                    out.groupSize = grp.length;
+                    return out;
+                }
+                out.reason = ratio >= 0.9 || ratio <= 0.5 ? 'ratio' : 'shape';
+            }
+            return out;
         }
 
-        // Tinh chỉnh tâm ô vuông ở độ phân giải đầy đủ (tâm khối đen liên thông quanh điểm thô)
+        // Tinh chỉnh tâm ô vuông trên ảnh đã vẽ vào khung 1000x1452 (tâm khối đen liên thông quanh điểm thô)
         function refineCornerOnPhoto(cx, cy, half) {
             const ctx = originalPhotoCanvas.getContext('2d');
             const x0 = Math.max(0, Math.round(cx - half)), y0 = Math.max(0, Math.round(cy - half));
@@ -2972,7 +2958,6 @@
             const lo = pct(0.05), hi = pct(0.95);
             if (hi - lo < 40) return { x: cx, y: cy };
             const thr = lo + 0.3 * (hi - lo);
-            // điểm đen gần tâm thô nhất
             let seed = -1, sd = Infinity;
             for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
                 if (lum[y * w + x] < thr) {
@@ -2980,7 +2965,7 @@
                     if (dd < sd) { sd = dd; seed = y * w + x; }
                 }
             }
-            if (seed < 0) return { x: cx, y: cy };
+            if (seed < 0 || sd > half * 0.6) return { x: cx, y: cy };
             const seen = new Uint8Array(w * h), st = [seed]; seen[seed] = 1;
             let n = 0, sx = 0, sy = 0;
             while (st.length) {
@@ -2995,24 +2980,151 @@
             return { x: x0 + sx / n + 0.5, y: y0 + sy / n + 0.5 };
         }
 
-        function autoCaptureNow(corners) {
+        // Dò 4 góc trên ảnh đang nạp (photoSource + góc xoay) -> toạ độ trong khung 1000x1452, hoặc null
+        function detectCornersForCurrentPhoto() {
+            if (!photoSource) return null;
+            const w0 = photoSource.videoWidth || photoSource.naturalWidth || photoSource.width;
+            const h0 = photoSource.videoHeight || photoSource.naturalHeight || photoSource.height;
+            if (!w0 || !h0) return null;
+            let src = photoSource, sw = w0, sh = h0;
+            if (photoRotation % 2 === 1 || photoRotation === 2) {
+                const odd = photoRotation % 2 === 1;
+                const c = document.createElement('canvas');
+                c.width = odd ? h0 : w0; c.height = odd ? w0 : h0;
+                const cx = c.getContext('2d');
+                cx.translate(c.width / 2, c.height / 2);
+                cx.rotate(photoRotation * Math.PI / 2);
+                cx.drawImage(photoSource, -w0 / 2, -h0 / 2);
+                src = c; sw = c.width; sh = c.height;
+            }
+            const det = detectSheetSquares(src, sw, sh);
+            if (!det.ok) return null;
+            const kx = SHEET_W / sw, ky = SHEET_H / sh;
+            const pts = {};
+            ['tl', 'tr', 'bl', 'br'].forEach(key => {
+                const c = det.corners[key];
+                const half = Math.max(c.w * kx, c.h * ky) * 0.5 * 1.6 + 4;
+                pts[key] = refineCornerOnPhoto(c.x * kx, c.y * ky, half);
+            });
+            return pts;
+        }
+
+        // =========================================================================
+        // CAMERA TRỰC TIẾP: tự nhận phiếu và tự chụp
+        // =========================================================================
+        const AUTO_STABLE_FRAMES = 4;      // ~0,7 giây giữ yên
+        let autoScanTimer = null, autoScanBusy = false, autoScanLast = null, autoScanStable = 0, autoScanStartAt = 0;
+        let camDevices = [], camDeviceIdx = -1;
+
+        function setAutoStatus(text, ok) {
+            const el = document.getElementById('camAutoStatus');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = ok ? '#fde047' : '';
+        }
+
+        function fitCameraStage() {
+            const v = document.getElementById('cameraVideo'), st = document.getElementById('cameraStage');
+            if (!v || !st || !v.videoWidth) return;
+            const asp = v.videoWidth / v.videoHeight;
+            st.style.aspectRatio = v.videoWidth + '/' + v.videoHeight;
+            st.style.width = 'min(100%, calc(78vh * ' + asp.toFixed(4) + '))';
+        }
+
+        function drawCameraDebug(det) {
+            const cv = document.getElementById('camDebug');
+            if (!cv) return;
+            if (!det) { const c = cv.getContext('2d'); c.clearRect(0, 0, cv.width, cv.height); return; }
+            if (cv.width !== det.AW || cv.height !== det.AH) { cv.width = det.AW; cv.height = det.AH; }
+            const c = cv.getContext('2d');
+            c.clearRect(0, 0, cv.width, cv.height);
+            c.lineWidth = 1.5;
+            c.strokeStyle = 'rgba(250,204,21,0.9)';
+            det.cands.slice(0, 20).forEach(m => c.strokeRect(m.x - m.w / 2 - 1.5, m.y - m.h / 2 - 1.5, m.w + 3, m.h + 3));
+            if (det.ok) {
+                const q = det.quad, col = autoScanStable >= 2 ? '#22c55e' : '#facc15';
+                c.lineWidth = 3; c.strokeStyle = col; c.fillStyle = autoScanStable >= 2 ? 'rgba(34,197,94,0.12)' : 'rgba(250,204,21,0.08)';
+                c.beginPath(); c.moveTo(q.tl.x, q.tl.y); c.lineTo(q.tr.x, q.tr.y); c.lineTo(q.br.x, q.br.y); c.lineTo(q.bl.x, q.bl.y); c.closePath(); c.fill(); c.stroke();
+                c.fillStyle = col;
+                [q.tl, q.tr, q.bl, q.br].forEach(p => { c.beginPath(); c.arc(p.x, p.y, 5, 0, Math.PI * 2); c.fill(); });
+            }
+        }
+
+        function startAutoScan() {
+            stopAutoScan();
+            autoScanBusy = false; autoScanLast = null; autoScanStable = 0;
+            autoScanStartAt = performance.now() + 700; // chờ camera lấy nét / lấy sáng
+            const wrap = document.getElementById('autoCapWrap');
+            if (wrap) { wrap.classList.remove('hidden'); wrap.style.display = 'flex'; }
+            setAutoStatus('Hướng camera vào phiếu, máy tự chụp khi thấy đủ 4 ô vuông đen', false);
+            autoScanTimer = setInterval(autoScanTick, 150);
+        }
+
+        function stopAutoScan() {
+            if (autoScanTimer) { clearInterval(autoScanTimer); autoScanTimer = null; }
+            const wrap = document.getElementById('autoCapWrap');
+            if (wrap) { wrap.classList.add('hidden'); wrap.style.display = 'none'; }
+            drawCameraDebug(null);
+        }
+
+        function autoScanTick() {
+            if (!mediaStream || autoScanBusy) return;
+            const video = document.getElementById('cameraVideo');
+            if (!video || !video.videoWidth || video.readyState < 2) return;
+            fitCameraStage();
+            const toggle = document.getElementById('autoCaptureToggle');
+            if (toggle && !toggle.checked) { setAutoStatus('Chế độ thủ công: bấm nút tròn để chụp', false); drawCameraDebug(null); return; }
+            if (performance.now() < autoScanStartAt) return;
+            autoScanBusy = true;                 // không chạy chồng
+            let det = null;
+            try { det = detectSheetSquares(video, video.videoWidth, video.videoHeight); } catch (e) { det = null; }
+            autoScanBusy = false;
+            if (!det) return;
+            if (det.ok) {
+                const q = det.quad, cur = [q.tl, q.tr, q.bl, q.br];
+                if (autoScanLast) {
+                    const disp = Math.max(...cur.map((c, i) => _dist(c, autoScanLast[i])));
+                    autoScanStable = disp < det.AW * 0.02 ? autoScanStable + 1 : 1;
+                } else autoScanStable = 1;
+                autoScanLast = cur;
+                drawCameraDebug(det);
+                setAutoStatus(`Đã thấy phiếu, giữ yên máy… ${Math.min(autoScanStable, AUTO_STABLE_FRAMES)}/${AUTO_STABLE_FRAMES}`, true);
+                if (autoScanStable >= AUTO_STABLE_FRAMES) {
+                    autoScanBusy = true;
+                    autoCaptureNow();
+                }
+            } else {
+                autoScanLast = null; autoScanStable = 0;
+                drawCameraDebug(det);
+                let msg = 'Hướng camera vào phiếu, tìm 4 ô vuông đen ở góc…';
+                if (det.cands.length >= 4) msg = 'Thấy ' + det.cands.length + ' ô vuông, đưa đủ cả tờ phiếu (4 góc) vào khung';
+                else if (det.cands.length > 0) msg = 'Mới thấy ' + det.cands.length + ' ô vuông, đưa đủ 4 góc phiếu vào khung';
+                setAutoStatus(msg, false);
+            }
+        }
+
+        function grabFullFrame(video) {
+            const snap = document.createElement('canvas');
+            snap.width = video.videoWidth;
+            snap.height = video.videoHeight;
+            snap.getContext('2d').drawImage(video, 0, 0);
+            return snap;
+        }
+
+        function autoCaptureNow() {
             const video = document.getElementById('cameraVideo');
             if (!video || !video.videoWidth) { autoScanBusy = false; return; }
-            const snap = grabCroppedFrame(video);
-            loadPhotoSource(snap);          // vẽ ảnh vào khung 1000x1452 và dừng camera
-            const kx = SHEET_W / AUTO_W, ky = SHEET_H / AUTO_H;
-            const keys = ['tl', 'tr', 'bl', 'br'];
-            const pts = {};
-            corners.forEach((c, i) => {
-                const half = Math.max(c.w * kx, c.h * ky) * 0.5 * 1.6 + 4;
-                pts[keys[i]] = refineCornerOnPhoto(c.x * kx, c.y * ky, half);
-            });
-            photoCornerPoints = pts;
-            warpPhotoToCanonicalBuffer();
-            const threshold = parseInt(document.getElementById('omrThresholdSlider').value) || 18;
-            runOMRDetectionOnBuffer(threshold);
+            loadPhotoSource(grabFullFrame(video));   // dừng camera, dò 4 góc lại trên đúng khung hình vừa chụp, nắn phẳng, chấm
             try { if (navigator.vibrate) navigator.vibrate(80); } catch (e) {}
             showToast('Đã tự chụp và chấm bài!');
+            scrollToScanResult();
+        }
+
+        function captureFromCameraAndGrade() {
+            const video = document.getElementById('cameraVideo');
+            if (!video.videoWidth) { showToast('Camera chưa sẵn sàng, thử lại sau giây lát.', 'error'); return; }
+            loadPhotoSource(grabFullFrame(video));
+            showToast('Đã chụp, tự bắt 4 góc đen và chấm bài!');
             scrollToScanResult();
         }
 
