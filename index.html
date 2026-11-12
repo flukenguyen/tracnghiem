@@ -778,7 +778,7 @@
                             </div>
                             <div class="text-right">
                                 <span class="text-xs text-slate-400 block">Tổng điểm</span>
-                                <span id="scanResultTotalScore" class="text-3xl font-black text-emerald-600">0.00</span>
+                                <span class="text-3xl font-black text-emerald-600 whitespace-nowrap"><span id="scanResultTotalScore">0.00</span><span id="scanResultTotalMax" class="text-base text-slate-400 font-bold whitespace-nowrap"></span></span>
                             </div>
                         </div>
 
@@ -2385,6 +2385,7 @@
                     : '⚠ Chưa đọc đủ 4 chữ số mã đề. Hãy chỉnh tâm lưới hoặc nhập mã đề thủ công.';
                 status.className = 'text-xs text-rose-600 font-semibold mt-1 block';
                 document.getElementById('scanResultTotalScore').textContent = '—';
+                { const m = document.getElementById('scanResultTotalMax'); if (m) m.textContent = ''; }
                 document.getElementById('scannedDetailComparison').innerHTML =
                     '<p class="text-sm text-rose-600 font-semibold">Chưa chấm: mã đề chưa được xác nhận. Không sử dụng đáp án của mã đề khác. Nhập mã đề đúng ở ô phía trên để chấm lại.</p>';
                 // Lưu tạm các câu đã đọc để thao tác nhập mã đề thủ công có thể chấm lại.
@@ -2447,12 +2448,14 @@
             const totalScore = p1Score + p2Score + p3Score;
 
             // Update Score UI
+            const _mx = calculateMaxTotalPoints(cfg);
             document.getElementById('scanResultTotalScore').textContent = totalScore.toFixed(2);
-            document.getElementById('scanScoreP1').textContent = p1Score.toFixed(2) + ' đ';
+            document.getElementById('scanResultTotalMax').textContent = ' / ' + _mx.total.toFixed(2);
+            document.getElementById('scanScoreP1').innerHTML = p1Score.toFixed(2) + '<span class="block text-[11px] font-bold text-slate-500">/ ' + _mx.p1Max.toFixed(2) + ' đ</span>';
             document.getElementById('scanHitP1').textContent = `${p1Correct}/${cfg.p1Count} câu`;
-            document.getElementById('scanScoreP2').textContent = p2Score.toFixed(2) + ' đ';
+            document.getElementById('scanScoreP2').innerHTML = p2Score.toFixed(2) + '<span class="block text-[11px] font-bold text-slate-500">/ ' + _mx.p2Max.toFixed(2) + ' đ</span>';
             document.getElementById('scanHitP2').textContent = `${p2SubCorrectTotal}/${cfg.p2Count * 4} ý`;
-            document.getElementById('scanScoreP3').textContent = p3Score.toFixed(2) + ' đ';
+            document.getElementById('scanScoreP3').innerHTML = p3Score.toFixed(2) + '<span class="block text-[11px] font-bold text-slate-500">/ ' + _mx.p3Max.toFixed(2) + ' đ</span>';
             document.getElementById('scanHitP3').textContent = `${p3Correct}/${cfg.p3Count} câu`;
 
             currentEvaluatedSheet = {
@@ -2598,19 +2601,22 @@
             ctx.fillStyle = '#dc2626';
             ctx.font = 'bold 28px JetBrains Mono, monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(currentEvaluatedSheet.totalScore.toFixed(2), 140, 188);
+            const _m2 = calculateMaxTotalPoints(getCurrentExam().config);
+            ctx.font = 'bold 24px JetBrains Mono, monospace';
+            ctx.fillText(currentEvaluatedSheet.totalScore.toFixed(2) + '/' + _m2.total.toFixed(2), 140, 186);
 
             ctx.strokeStyle = '#dc2626';
             ctx.lineWidth = 2.2;
             ctx.beginPath();
-            ctx.ellipse(140, 178, 38, 22, -0.06, 0, Math.PI * 2);
+            ctx.ellipse(140, 178, 56, 24, -0.06, 0, Math.PI * 2);
             ctx.stroke();
 
             ctx.font = 'bold 10.5px Inter, sans-serif';
             ctx.textAlign = 'left';
-            ctx.fillText(`P.I: ${currentEvaluatedSheet.p1Score.toFixed(2)}đ`, 192, 168);
-            ctx.fillText(`P.II: ${currentEvaluatedSheet.p2Score.toFixed(2)}đ`, 192, 184);
-            ctx.fillText(`P.III: ${currentEvaluatedSheet.p3Score.toFixed(2)}đ`, 192, 200);
+            ctx.font = 'bold 9.5px Inter, sans-serif';
+            ctx.fillText(`I: ${currentEvaluatedSheet.p1Score.toFixed(2)}/${_m2.p1Max.toFixed(2)}`, 202, 166);
+            ctx.fillText(`II: ${currentEvaluatedSheet.p2Score.toFixed(2)}/${_m2.p2Max.toFixed(2)}`, 202, 182);
+            ctx.fillText(`III: ${currentEvaluatedSheet.p3Score.toFixed(2)}/${_m2.p3Max.toFixed(2)}`, 202, 198);
             ctx.restore();
         }
 
@@ -3707,12 +3713,12 @@
             document.getElementById('modalScoreSummary').innerHTML = `
                 <div class="p-3 rounded-xl bg-slate-100">
                     <span class="text-xs text-slate-500 block">Tổng điểm</span>
-                    <span class="text-2xl font-black text-emerald-600">${rec.totalScore.toFixed(2)} đ</span>
+                    <span class="text-2xl font-black text-emerald-600">${rec.totalScore.toFixed(2)} / ${calculateMaxTotalPoints(getCurrentExam().config).total.toFixed(2)} đ</span>
                 </div>
                 <div class="p-3 rounded-xl bg-slate-100 text-xs space-y-1">
-                    <div class="flex justify-between"><span>Phần I (ABCD):</span> <b>${rec.p1Score.toFixed(2)} đ</b></div>
-                    <div class="flex justify-between"><span>Phần II (Đúng/Sai):</span> <b>${rec.p2Score.toFixed(2)} đ</b></div>
-                    <div class="flex justify-between"><span>Phần III (TL Ngắn):</span> <b>${rec.p3Score.toFixed(2)} đ</b></div>
+                    <div class="flex justify-between"><span>Phần I (ABCD):</span> <b>${rec.p1Score.toFixed(2)} / ${calculateMaxTotalPoints(getCurrentExam().config).p1Max.toFixed(2)} đ</b></div>
+                    <div class="flex justify-between"><span>Phần II (Đúng/Sai):</span> <b>${rec.p2Score.toFixed(2)} / ${calculateMaxTotalPoints(getCurrentExam().config).p2Max.toFixed(2)} đ</b></div>
+                    <div class="flex justify-between"><span>Phần III (TL Ngắn):</span> <b>${rec.p3Score.toFixed(2)} / ${calculateMaxTotalPoints(getCurrentExam().config).p3Max.toFixed(2)} đ</b></div>
                 </div>
             `;
 
