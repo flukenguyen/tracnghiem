@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>HCTMaker Pro - Chấm Thi Trắc Nghiệm BGD 2025 Bằng Camera</title>
+    <title>TNMaker Pro - Chấm Thi Trắc Nghiệm BGD 2025 Bằng Camera</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -167,19 +167,17 @@
             <div class="flex items-center justify-between h-14 md:h-16 gap-2">
                 <!-- Brand -->
                 <div class="flex items-center gap-2 md:gap-3 min-w-0">
-                    <div class="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center">
-                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRoE5Mx8L0R7NMOLgPx9w7ZPgAQBd5Ts_Y5zBzrJ0-f7AdgWfWALqCZe2E-&s=10"
+                    <div class="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center shadow-md">
+                        <i class="fa-solid fa-camera-viewfinder text-xl text-white"></i>
                     </div>
-                    <i class="fa-solid fa-camera-viewfinder text-xl text-white"></i>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="font-bold text-lg tracking-tight">HCTMaker <span class="text-emerald-400">Pro</span></span>
-                        <span class="hidden sm:inline-block text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">Mẫu Đen Trắng BGD 2025</span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-lg tracking-tight">TNMaker <span class="text-emerald-400">Pro</span></span>
+                            <span class="hidden sm:inline-block text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">Mẫu Đen Trắng BGD 2025</span>
+                        </div>
+                        <p class="text-xs text-slate-400 hidden sm:block">Chuẩn Phiếu TLTN 2025 Mã đề 4 số đen trắng (GDPT 2018)</p>
                     </div>
-                    <p class="text-xs text-slate-400 hidden sm:block">Chuẩn Phiếu TLTN 2025 Mã đề 4 số đen trắng (GDPT 2018) - (copyright © Trần Tài Lộc)</p>
                 </div>
-            </div>
 
                 <!-- Exam Selector Quick Bar -->
                 <div class="flex items-center gap-2 md:gap-3 min-w-0">
@@ -723,14 +721,15 @@
                             <canvas id="omrScannerCanvas" width="1000" height="1452" class="w-full max-h-[78vh] md:max-h-[720px] object-contain bg-white"></canvas>
 
                             <!-- Camera toàn màn hình: hiện ngay khi vào tab Quét, tự tìm 4 ô vuông đen -->
-                            <div id="cameraStage" class="hidden fixed inset-0 z-[70] bg-black">
+                            <div id="cameraStage" class="hidden fixed left-0 top-0 w-full z-[70] bg-black" style="height:100vh;height:100dvh;">
                                 <div id="camInner" class="absolute" style="left:0;top:0;width:100%;height:100%;">
-                                    <video id="cameraVideo" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
+                                    <video id="cameraVideo" autoplay playsinline webkit-playsinline muted disablepictureinpicture class="absolute inset-0 w-full h-full object-cover"></video>
                                     <canvas id="camDebug" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
                                     <div id="cameraViewfinderOverlay" class="absolute inset-0 pointer-events-none overflow-hidden">
                                         <div class="scanner-laser"></div>
                                     </div>
                                 </div>
+                                <button id="camTapStart" onclick="resumeCameraVideo()" class="hidden absolute inset-0 m-auto w-56 h-14 z-10 rounded-2xl bg-emerald-600 text-white font-bold text-sm shadow-xl">Chạm để bật camera</button>
                                 <button onclick="stopLiveCamera()" class="absolute top-3 left-3 w-10 h-10 rounded-full bg-black/60 border border-white/30 text-white text-xl font-bold flex items-center justify-center" aria-label="Đóng camera">&#10005;</button>
                                 <button id="camSwitchBtn" onclick="switchCamera()" class="hidden absolute top-3 right-3 px-3 py-2 rounded-xl bg-black/60 border border-white/30 text-white text-xs font-bold" aria-label="Đổi camera">&#x21BB; Đổi camera</button>
                                 <div class="absolute top-16 inset-x-0 flex justify-center gap-2 px-3 flex-wrap">
@@ -3468,6 +3467,23 @@ if (typeof module !== 'undefined') module.exports = TNQR;
         // =========================================================================
         // 7. CAMERA STREAMING, UPLOAD & SIMULATED SHEET SCANNING
         // =========================================================================
+        // iOS Safari chỉ phát video khi phần tử đang hiển thị; nếu bị chặn tự phát thì hiện nút chạm để bật
+        async function resumeCameraVideo() {
+            const video = document.getElementById('cameraVideo'), tap = document.getElementById('camTapStart');
+            try {
+                await video.play();
+                if (tap) tap.classList.add('hidden');
+            } catch (e) {
+                if (tap) tap.classList.remove('hidden');
+            }
+        }
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && mediaStream) resumeCameraVideo(); });
+        window.addEventListener('pageshow', () => {
+            if (!mediaStream) return;
+            const t = mediaStream.getVideoTracks()[0];
+            if (!t || t.readyState === 'ended') { stopLiveCamera(); startLiveCamera(); } else resumeCameraVideo();
+        });
+
         async function openCameraStream(deviceId) {
             const video = document.getElementById('cameraVideo');
             if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
@@ -3476,8 +3492,10 @@ if (typeof module !== 'undefined') module.exports = TNQR;
                 : { facingMode: { ideal: 'environment' }, width: { ideal: 1440 }, height: { ideal: 1920 } };
             mediaStream = await navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
             video.srcObject = mediaStream;
+            video.muted = true; video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', '');
             video.onloadedmetadata = fitCameraStage;
-            try { await video.play(); } catch (e) {}
+            video.onresize = fitCameraStage;
+            await resumeCameraVideo();
             fitCameraStage();
             // Lấy nét liên tục + góc rộng nhất (zoom nhỏ nhất) để đứng gần phiếu mà vẫn thấy đủ 4 góc
             const zoomEl = document.getElementById('camZoom');
@@ -3515,15 +3533,19 @@ if (typeof module !== 'undefined') module.exports = TNQR;
             } catch (e) { showToast('Không đổi được camera này.', 'error'); }
         }
 
+        let cameraStarting = false;
         async function startLiveCamera() {
             const canvas = document.getElementById('omrScannerCanvas');
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.isSecureContext) {
                 showToast('Camera trực tiếp chỉ chạy khi mở trang bằng HTTPS. Hãy bấm "Chụp ảnh phiếu" (dùng ứng dụng camera của máy).', 'error');
                 return;
             }
+            if (cameraStarting || mediaStream) return;
+            cameraStarting = true;
+            const stage = document.getElementById('cameraStage');
             try {
+                stage.classList.remove('hidden');          // phải hiện khung TRƯỚC khi gắn luồng camera (iOS)
                 await openCameraStream(null);
-                document.getElementById('cameraStage').classList.remove('hidden');
                 canvas.classList.add('hidden');
                 document.getElementById('btnStartCam').classList.add('hidden');
                 document.getElementById('btnStopCam').classList.remove('hidden');
@@ -3532,8 +3554,10 @@ if (typeof module !== 'undefined') module.exports = TNQR;
                 startAutoScan();
                 showToast('Đã bật Camera. Hướng vào phiếu, máy sẽ tự chụp khi thấy đủ 4 ô vuông đen.');
             } catch (err) {
+                stage.classList.add('hidden');
+                if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
                 showToast('Không mở được camera (chưa cấp quyền hoặc thiết bị không có camera). Hãy dùng "Chụp ảnh phiếu" hoặc "Chọn ảnh có sẵn".', 'error');
-            }
+            } finally { cameraStarting = false; }
         }
 
         function stopLiveCamera() {
